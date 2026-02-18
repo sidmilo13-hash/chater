@@ -2,24 +2,29 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Messenger Pro Online</title>
 
 <style>
-:root { --primary:#075e54; --bg:#e5ddd5; --me:#dcf8c6; --them:#fff; }
-body{font-family:sans-serif;background:#d1d7db;margin:0;display:flex;justify-content:center;align-items:center;height:100vh}
-.card{background:white;width:100%;max-width:400px;height:100vh;display:flex;flex-direction:column;box-shadow:0 4px 15px rgba(0,0,0,.1)}
-.hidden{display:none!important}
-header{background:var(--primary);color:white;padding:15px;display:flex;justify-content:space-between;align-items:center;font-weight:bold}
-#chat-box{flex:1;overflow-y:auto;padding:15px;background:var(--bg);display:flex;flex-direction:column}
-.msg{margin:5px 0;padding:10px 15px;border-radius:15px;max-width:75%;font-size:15px;word-wrap:break-word}
-.msg-me{align-self:flex-end;background:var(--me)}
-.msg-them{align-self:flex-start;background:var(--them)}
-.input-area{padding:10px;background:#f0f0f0;display:flex;gap:10px}
-input{width:100%;padding:12px;border:1px solid #ccc;border-radius:25px;outline:none}
-button{background:var(--primary);color:white;border:none;padding:10px 20px;border-radius:20px;cursor:pointer}
-.room-item{padding:15px;border-bottom:1px solid #eee;cursor:pointer}
-.danger-btn{background:none;color:#b91c1c;font-size:12px;border:1px solid #fecaca;margin:10px;padding:8px;border-radius:5px}
+:root { --primary:#075e54; --bg:#e5ddd5; --me:#dcf8c6; --them:#ffffff; }
+body { font-family:-apple-system,sans-serif;background:#d1d7db;margin:0;display:flex;justify-content:center;align-items:center;height:100vh; }
+.card { background:white;width:100%;max-width:400px;height:100vh;display:flex;flex-direction:column;box-shadow:0 4px 15px rgba(0,0,0,0.1); }
+.hidden { display:none!important; }
+
+header { background:#075e54;color:white;padding:15px;display:flex;justify-content:space-between;align-items:center; }
+
+.room-item { padding:15px;border-bottom:1px solid #eee;cursor:pointer;display:flex;justify-content:space-between;align-items:center; }
+.room-item:hover { background:#f5f5f5; }
+
+#chat-box { flex:1;overflow-y:auto;padding:15px;background:var(--bg);display:flex;flex-direction:column; }
+.msg { margin:5px 0;padding:10px 15px;border-radius:15px;max-width:75%;font-size:15px;box-shadow:0 1px 1px rgba(0,0,0,0.1);position:relative; }
+.msg-me { align-self:flex-end;background:var(--me);border-bottom-right-radius:2px; }
+.msg-them { align-self:flex-start;background:var(--them);border-bottom-left-radius:2px; }
+.msg-info { font-size:10px;color:#777;margin-bottom:4px;display:block; }
+
+input { width:100%;padding:12px;border:1px solid #ccc;border-radius:25px;outline:none; }
+.input-area { padding:10px;background:#f0f0f0;display:flex;gap:10px;align-items:center; }
+button { background:var(--primary);color:white;border:none;padding:10px 20px;border-radius:20px;cursor:pointer;font-weight:bold; }
 </style>
 </head>
 <body>
@@ -28,78 +33,63 @@ button{background:var(--primary);color:white;border:none;padding:10px 20px;borde
 <div id="screen-list" class="card">
 <header>
 <span>Messenger</span>
-<button onclick="showCreateRoom()">+ New Chat</button>
+<button onclick="showCreateRoom()" style="background:rgba(255,255,255,0.2)">+ New</button>
 </header>
 <div id="room-list" style="flex:1;overflow-y:auto;"></div>
-<button class="danger-btn" onclick="resetApp()">Reset All Data & PIN</button>
 </div>
 
 <!-- SCREEN 2 -->
-<div id="screen-setup" class="card hidden" style="justify-content:center;padding:20px">
-<h2>Start a Chat</h2>
+<div id="screen-setup" class="card hidden" style="justify-content:center;padding:20px;">
+<h2>Join or Create</h2>
 <input id="user-name" placeholder="Your Name">
 <input id="room-name" placeholder="Room Name">
-<button onclick="startChat()">Enter Room</button>
-<button onclick="showList()" style="background:none;color:#666;margin-top:20px">Cancel</button>
+<button onclick="enterRoom()" style="width:100%;margin-top:10px;">Enter Room</button>
+<button onclick="showList()" style="background:none;color:#666;margin-top:20px;">Cancel</button>
 </div>
 
 <!-- SCREEN 3 -->
 <div id="screen-chat" class="card hidden">
 <header>
-<button onclick="showList()" style="background:none;color:white;font-size:20px">←</button>
+<button onclick="showList()" style="background:none;">←</button>
 <span id="display-room">Room</span>
-<span style="font-size:12px">Online Sync</span>
+<span style="font-size:12px;">Cloud Sync</span>
 </header>
 <div id="chat-box"></div>
 <div class="input-area">
-<input id="message-input" placeholder="Message..." onkeypress="if(event.key==='Enter')sendMessage()">
-<button onclick="sendMessage()" style="background:#25d366">➤</button>
+<input id="message-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMessage()">
+<button onclick="sendMessage()" style="background:#25d366;width:50px;border-radius:50%;">➤</button>
 </div>
 </div>
 
 <script>
-/* ================== JSONBIN CONFIG ================== */
+/* ============ CONFIG ============ */
 const BIN_ID = "69956e3c43b1c97be987d4e6";
 const API_KEY = "$2a$10$yfzcDWcZY6VdYg.R4RkmS.8mmppM2hyJrou3Jmn2ymiYT5f0B7CR6";
 const BASE = "https://api.jsonbin.io/v3/b/" + "69956e3c43b1c97be987d4e6";
-/* ==================================================== */
+/* ================================= */
 
 let myName, myRoom;
 
-/* ================= PIN SYSTEM ================= */
-(function(){
-let savedPin=localStorage.getItem("master_pin");
-if(!savedPin){
-let newPin=prompt("Set 4-digit PIN:");
-if(newPin&&newPin.length>=4){
-localStorage.setItem("master_pin",newPin);
-location.reload();
-}else{alert("Invalid PIN");location.reload();}
+/* ============ PIN SYSTEM ============ */
+window.onload = function(){
+const pin = localStorage.getItem("master_pin") || prompt("Create a Master PIN:");
+if(!localStorage.getItem("master_pin")) localStorage.setItem("master_pin",pin);
+if(prompt("Enter PIN:") !== localStorage.getItem("master_pin")){
+document.body.innerHTML="<h1 style='text-align:center;margin-top:50px;'>Locked</h1>";
 }else{
-let entered=prompt("Enter PIN:");
-if(entered===savedPin){setTimeout(showList,100);}
-else{document.body.innerHTML="<h1 style='text-align:center;margin-top:50px;color:red;'>LOCKED</h1>";}
+showList();
 }
-})();
+};
 
-function resetApp(){
-let confirmPin=prompt("Enter PIN to reset:");
-if(confirmPin===localStorage.getItem("master_pin")){
-localStorage.clear();
-alert("Reset!");
-location.reload();
-}else alert("Wrong PIN");
-}
-
-/* =============== SCREEN CONTROL =============== */
+/* ============ SCREEN CONTROL ============ */
 function showList(){
-document.querySelectorAll('.card').forEach(c=>c.classList.add('hidden'));
+document.querySelectorAll('.card').forEach(s=>s.classList.add('hidden'));
 document.getElementById('screen-list').classList.remove('hidden');
 renderRoomList();
 }
 
 function showCreateRoom(){
-document.querySelectorAll('.card').forEach(c=>c.classList.add('hidden'));
+document.querySelectorAll('.card').forEach(s=>s.classList.add('hidden'));
 document.getElementById('screen-setup').classList.remove('hidden');
 }
 
@@ -108,16 +98,22 @@ const listDiv=document.getElementById('room-list');
 listDiv.innerHTML="";
 const rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
 rooms.forEach(room=>{
-listDiv.innerHTML+=`<div class="room-item" onclick="enterRoom('${room}')"><b># ${room}</b></div>`;
+listDiv.innerHTML+=`
+<div class="room-item" onclick="quickEnter('${room}')">
+<b># ${room}</b>
+<span style="color:#999;font-size:12px;">Cloud History</span>
+</div>`;
 });
 }
 
-function enterRoom(room){
-document.getElementById('room-name').value=room;
-showCreateRoom();
+function quickEnter(room){
+myRoom=room;
+myName=prompt("Enter your name:");
+if(!myName) return;
+openChat();
 }
 
-/* =============== JSONBIN FUNCTIONS =============== */
+/* ============ JSONBIN ============ */
 
 async function getData(){
 const res=await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY}});
@@ -136,28 +132,30 @@ body:JSON.stringify(data)
 });
 }
 
-/* =============== CHAT LOGIC =============== */
+/* ============ CHAT ============ */
 
-async function startChat(){
+function enterRoom(){
 myName=document.getElementById('user-name').value.trim();
 myRoom=document.getElementById('room-name').value.trim().toLowerCase();
-if(!myName||!myRoom) return alert("Fill fields");
+if(!myName||!myRoom) return alert("Fill in fields!");
 
 let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
 if(!rooms.includes(myRoom)){
 rooms.push(myRoom);
 localStorage.setItem("saved_rooms",JSON.stringify(rooms));
 }
+openChat();
+}
 
-document.querySelectorAll('.card').forEach(c=>c.classList.add('hidden'));
+function openChat(){
+document.querySelectorAll('.card').forEach(s=>s.classList.add('hidden'));
 document.getElementById('screen-chat').classList.remove('hidden');
 document.getElementById('display-room').textContent=myRoom;
-
 loadMessages();
 }
 
 async function sendMessage(){
-const input=document.getElementById("message-input");
+const input=document.getElementById('message-input');
 if(!input.value.trim()) return;
 
 let data=await getData();
@@ -177,19 +175,26 @@ loadMessages();
 
 async function loadMessages(){
 let data=await getData();
-const box=document.getElementById("chat-box");
+const box=document.getElementById('chat-box');
 box.innerHTML="";
 if(!data.rooms||!data.rooms[myRoom]) return;
 
-data.rooms[myRoom].forEach(i=>{
-const div=document.createElement("div");
-div.className="msg "+(i.user===myName?"msg-me":"msg-them");
-div.innerHTML=`<small style="font-size:10px;font-weight:bold;color:#555;">${i.user}</small>${i.msg}`;
-box.appendChild(div);
+data.rooms[myRoom].forEach(item=>{
+const type=item.user===myName?'msg-me':'msg-them';
+renderMessage(item.user,item.msg,type);
 });
+}
+
+function renderMessage(user,msg,type){
+const box=document.getElementById('chat-box');
+const div=document.createElement('div');
+div.className=`msg ${type}`;
+div.innerHTML=`<span class="msg-info">${user}</span>${msg}`;
+box.appendChild(div);
 box.scrollTop=box.scrollHeight;
 }
 
+/* Auto refresh */
 setInterval(loadMessages,3000);
 </script>
 </body>
