@@ -1,131 +1,104 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pro Messenger</title>
-    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        :root { --primary: #075e54; --bg: #e5ddd5; }
-        body { font-family: sans-serif; display: flex; justify-content: center; padding: 20px; background: #d1d7db; margin: 0; height: 100vh; align-items: center; }
-        .card { background: white; padding: 25px; border-radius: 10px; width: 100%; max-width: 350px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
-        .hidden { display: none !important; }
-        input { width: 100%; box-sizing: border-box; padding: 12px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; background: var(--primary); }
-        #chat-box { height: 300px; border: 1px solid #ddd; overflow-y: auto; margin: 10px 0; padding: 10px; background: #fff; text-align: left; border-radius: 5px; }
-        .status { font-size: 0.75em; color: #777; text-align: center; margin: 5px 0; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-weight: bold; color: var(--primary); }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friends Chat</title>
+
+<style>
+body{font-family:sans-serif;margin:0;background:#e5ddd5;display:flex;justify-content:center;align-items:center;height:100vh}
+.card{background:white;width:100%;max-width:400px;height:100vh;display:flex;flex-direction:column}
+header{background:#075e54;color:white;padding:15px;font-weight:bold}
+#chat{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column}
+.msg{margin:5px 0;padding:10px;border-radius:15px;max-width:70%}
+.me{background:#dcf8c6;align-self:flex-end}
+.them{background:white;align-self:flex-start}
+.input-area{display:flex;padding:10px;background:#f0f0f0}
+input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc}
+button{background:#25d366;color:white;border:none;padding:10px 15px;border-radius:20px;margin-left:5px}
+</style>
 </head>
 <body>
 
-<!-- SCREEN 1: LOGIN -->
-<div id="login-screen" class="card">
-    <h2 style="color:var(--primary)">Messenger</h2>
-    <input type="text" id="user-name" placeholder="Your Name">
-    <input type="text" id="room-name" placeholder="Room Name (e.g. chat123)">
-    <button onclick="start(true)">Create Chat</button>
-    <button onclick="start(false)" style="background:#6c757d; margin-top:8px;">Join Chat</button>
+<div class="card">
+<header id="roomTitle">Room</header>
+<div id="chat"></div>
+<div class="input-area">
+<input id="msgInput" placeholder="Message..." onkeypress="if(event.key==='Enter')sendMsg()">
+<button onclick="sendMsg()">Send</button>
 </div>
-
-<!-- SCREEN 2: CHAT -->
-<div id="chat-screen" class="card hidden">
-    <header>
-        <span id="display-room">Room</span>
-        <span id="user-count" style="font-size: 0.8em; background: #eee; padding: 2px 8px; border-radius: 10px;">Online: 1</span>
-    </header>
-    <div id="chat-box"></div>
-    <input type="text" id="message-input" placeholder="Type message..." onkeypress="if(event.key === 'Enter') sendMessage()">
-    <button onclick="sendMessage()" style="background:#25d366">Send</button>
-    <button onclick="location.reload()" style="background:none; color:red; font-size:12px; margin-top:10px;">Exit Chat</button>
 </div>
 
 <script>
-    let peer, conn, myName, myRoom;
+const BIN_ID = "69956e3c43b1c97be987d4e6";
+const API_KEY = "$2a$10$yfzcDWcZY6VdYg.R4RkmS.8mmppM2hyJrou3Jmn2ymiYT5f0B7CR6";
+const BASE_URL = "https://api.jsonbin.io/v3/b/" + "69956e3c43b1c97be987d4e6";
 
-    function start(isHost) {
-        myName = document.getElementById('user-name').value.trim();
-        myRoom = document.getElementById('room-name').value.trim().toLowerCase();
+let user = prompt("Your Name?");
+let room = prompt("Room Name?").toLowerCase();
+document.getElementById("roomTitle").textContent = room;
 
-        if (!myName || !myRoom) return alert("Fill in all fields!");
+async function getData() {
+  const res = await fetch(BASE_URL + "/latest", {
+    headers: { "X-Master-Key": API_KEY }
+  });
+  const data = await res.json();
+  return data.record;
+}
 
-        // Switch screens
-        document.getElementById('login-screen').classList.add('hidden');
-        document.getElementById('chat-screen').classList.remove('hidden');
-        document.getElementById('display-room').textContent = myRoom;
+async function saveData(data) {
+  await fetch(BASE_URL, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Master-Key": API_KEY
+    },
+    body: JSON.stringify(data)
+  });
+}
 
-        // Host ID = Room Name. Joiner ID = Random.
-        const myID = isHost ? myRoom : myRoom + "-user-" + Math.floor(Math.random()*999);
+async function sendMsg() {
+  const input = document.getElementById("msgInput");
+  if (!input.value.trim()) return;
 
-        peer = new Peer(myID, {
-            config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }] },
-            secure: true, debug: 3
-        });
+  let data = await getData();
 
-        peer.on('open', (id) => {
-            if (!isHost) {
-                addStatus("Searching for room...");
-                // Joiner calls the Host
-                conn = peer.connect(myRoom);
-                setupChat();
+  if (!data.rooms[room]) {
+    data.rooms[room] = [];
+  }
 
-                // Invalid Chat Alert (Timeout)
-                setTimeout(() => {
-                    if (!conn.open) {
-                        alert("Invalid Chat: Room not found!");
-                        location.reload();
-                    }
-                }, 5000);
-            }
-        });
+  data.rooms[room].push({
+    user: user,
+    text: input.value,
+    time: Date.now()
+  });
 
-        peer.on('connection', (incoming) => {
-            conn = incoming;
-            setupChat();
-            addStatus("Friend connected!");
-            document.getElementById('user-count').textContent = "Online: 2";
-        });
+  await saveData(data);
 
-        peer.on('error', (err) => {
-            if (err.type === 'unavailable-id') alert("Room already exists! Click 'Join' instead.");
-            else console.error(err);
-        });
-    }
+  input.value = "";
+  loadMessages();
+}
 
-    function setupChat() {
-        conn.on('open', () => {
-            addStatus("Connection Active!");
-            document.getElementById('user-count').textContent = "Online: 2";
-        });
-        conn.on('data', (data) => {
-            addMessage(data.user + ": " + data.msg);
-        });
-        conn.on('close', () => {
-            addStatus("Friend disconnected.");
-            document.getElementById('user-count').textContent = "Online: 1";
-        });
-    }
+async function loadMessages() {
+  let data = await getData();
+  const chat = document.getElementById("chat");
+  chat.innerHTML = "";
 
-    function sendMessage() {
-        const input = document.getElementById('message-input');
-        if (conn && conn.open) {
-            conn.send({ user: myName, msg: input.value });
-            addMessage("Me: " + input.value);
-            input.value = "";
-        } else {
-            alert("Not connected to anyone yet!");
-        }
-    }
+  if (!data.rooms[room]) return;
 
-    function addMessage(msg) {
-        const box = document.getElementById('chat-box');
-        box.innerHTML += `<p style="margin:5px 0;">${msg}</p>`;
-        box.scrollTop = box.scrollHeight;
-    }
+  data.rooms[room].forEach(msg => {
+    const div = document.createElement("div");
+    div.className = "msg " + (msg.user === user ? "me" : "them");
+    div.innerHTML = "<b style='font-size:10px'>" + msg.user + "</b><br>" + msg.text;
+    chat.appendChild(div);
+  });
 
-    function addStatus(text) {
-        const box = document.getElementById('chat-box');
-        box.innerHTML += `<p class="status">${text}</p>`;
-    }
+  chat.scrollTop = chat.scrollHeight;
+}
+
+setInterval(loadMessages, 2000);
+loadMessages();
 </script>
+
 </body>
 </html>
