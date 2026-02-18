@@ -10,236 +10,240 @@ body { font-family:-apple-system,sans-serif;background:#d1d7db;margin:0;display:
 .card { background:white;width:100%;max-width:400px;height:100vh;display:flex;flex-direction:column;box-shadow:0 4px 15px rgba(0,0,0,.1); }
 .hidden { display:none!important; }
 header { background:#075e54;color:white;padding:15px;display:flex;justify-content:space-between;align-items:center; }
-.room-item { padding:10px 15px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center; }
+.room-item { padding:12px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;cursor:pointer; }
 .room-item:hover { background:#f5f5f5; }
-.room-item div { flex:1; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
 #chat-box { flex:1;overflow-y:auto;padding:15px;background:var(--bg);display:flex;flex-direction:column; }
-.msg { margin:5px 0;padding:10px 15px;border-radius:15px;max-width:75%;font-size:15px;box-shadow:0 1px 1px rgba(0,0,0,.1); position:relative; }
+.msg { margin:5px 0;padding:10px 15px;border-radius:15px;max-width:75%;font-size:14px;box-shadow:0 1px 1px rgba(0,0,0,.1); }
 .msg-me { align-self:flex-end;background:var(--me); }
 .msg-them { align-self:flex-start;background:var(--them); }
-.msg-info { font-size:10px;color:#777;margin-bottom:4px;display:block; }
-input { width:100%;padding:12px;border:1px solid #ccc;border-radius:25px;outline:none; }
-.input-area { padding:10px;background:#f0f0f0;display:flex;gap:10px;align-items:center; }
-button { background:var(--primary);color:white;border:none;padding:10px 20px;border-radius:20px;cursor:pointer;font-weight:bold; }
-button.secondary { background:#6c757d; }
-button.danger { background:#dc3545; }
+.msg-info { font-size:10px;color:#777;margin-bottom:3px;display:block; }
+.input-area { padding:10px;background:#f0f0f0;display:flex;gap:10px; }
+input { flex:1;padding:10px;border-radius:20px;border:1px solid #ccc; }
+button { background:var(--primary);color:white;border:none;padding:8px 12px;border-radius:20px;font-size:12px;cursor:pointer; }
 button:disabled { opacity:.5; }
-.setting-btn { margin:10px 15px; }
-.online { font-size:12px;opacity:.9; }
-.error { color:red;font-size:12px;text-align:center;margin-top:5px; }
-.badge { background:red;color:white;border-radius:50%;font-size:10px;width:18px;height:18px;text-align:center;line-height:18px;margin-left:5px; }
+.admin { background:#f3f3f3;padding:8px;margin:5px;border-radius:10px;font-size:12px; }
+.lock { font-size:14px;margin-left:5px; }
+.user-item { display:flex;justify-content:space-between;margin:2px 0; }
+.online { font-size:12px; }
 </style>
 </head>
 <body>
 
-<!-- ROOM LIST -->
-<div id="screen-list" class="card">
+<!-- Room List Screen -->
+<div id="screen-list" class="card hidden">
 <header>
 <span>Messenger</span>
-<div>
 <span id="global-online" class="online">Online: 0</span>
-<button onclick="showSettings()" style="margin-left:10px;background:#333;">⚙</button>
-</div>
 </header>
-<div id="room-list" style="flex:1;overflow-y:auto;"></div>
-<button onclick="showSetup()" style="margin:15px;">+ New Chat</button>
+<div id="room-list" style="flex:1;overflow:auto;"></div>
+<button type="button" onclick="showSetup()" style="margin:10px;">+ New Chat</button>
 </div>
 
-<!-- SETUP -->
-<div id="screen-setup" class="card hidden" style="justify-content:center;padding:20px;">
-<h2>Create or Join</h2>
-<input id="room-name" placeholder="Room Name">
-<button onclick="createRoom()" style="width:100%;margin-top:10px;">Create Room</button>
-<button onclick="joinRoom()" class="secondary" style="width:100%;margin-top:10px;">Join Room</button>
-<button onclick="showList()" style="background:none;color:#666;margin-top:20px;">Cancel</button>
-<div id="error-msg" class="error"></div>
+<!-- Create / Join Screen -->
+<div id="screen-setup" class="card hidden" style="padding:20px;justify-content:center;">
+<h3>Create / Join</h3>
+<input id="room-name" placeholder="Room name">
+<label><input type="checkbox" id="privateBox"> Private</label>
+<input id="room-pass" placeholder="Password" type="password" style="display:none;margin-top:5px;">
+<button type="button" id="createBtn" style="margin-top:10px;">Create</button>
+<button type="button" id="joinBtn" style="margin-top:5px;background:#6c757d;">Join</button>
+<button type="button" onclick="showList()" style="background:none;color:#555;margin-top:15px;">Cancel</button>
 </div>
 
-<!-- CHAT -->
+<!-- Chat Screen -->
 <div id="screen-chat" class="card hidden">
 <header>
-<button onclick="showList()" style="background:none;">←</button>
-<span id="display-room"></span>
-<span id="room-online" class="online">Online: 0</span>
+<button type="button" onclick="showList()" style="background:none;">←</button>
+<span id="room-title"></span>
+<span id="room-online" class="online"></span>
 </header>
-<div id="chat-box"></div>
-<div class="input-area">
-<input id="message-input" placeholder="Type message..."
-oninput="checkInput()" 
-onkeypress="if(event.key==='Enter')sendMessage()">
-<button id="send-btn" onclick="sendMessage()" disabled style="background:#25d366;width:50px;border-radius:50%;">➤</button>
-</div>
-</div>
 
-<!-- SETTINGS -->
-<div id="screen-settings" class="card hidden">
-<header>
-<button onclick="showList()" style="background:none;">←</button>
-<span>Settings</span>
-<span></span>
-</header>
-<button class="setting-btn" onclick="resetName()">Reset Name</button>
-<button class="setting-btn" onclick="resetPIN()">Reset PIN</button>
-<button class="setting-btn danger" onclick="clearRooms()">Clear Saved Rooms</button>
+<div id="admin-panel" class="admin hidden"></div>
+<div id="chat-box"></div>
+
+<div class="input-area">
+<input id="msg" placeholder="Type message..." oninput="checkInput()" onkeypress="if(event.key==='Enter')sendMsg()">
+<button id="sendBtn" type="button" onclick="sendMsg()" disabled>➤</button>
+</div>
 </div>
 
 <script>
 /* ============ CONFIG ============ */
-const BIN_ID = "69956e3c43b1c97be987d4e6";
-const API_KEY = "$2a$10$yfzcDWcZY6VdYg.R4RkmS.8mmppM2hyJrou3Jmn2ymiYT5f0B7CR6";
-const BASE = "https://api.jsonbin.io/v3/b/" + "69956e3c43b1c97be987d4e6";
+const BIN_ID = "6995c8e9ae596e708f347d9b";
+const API_KEY = "$2a$10$Xoj7gk3UMX/Xu39sZjITbe1vTxinpZ3KjHuDNvIBeVmMqxBLt5HC.";
+const BASE = "https://api.jsonbin.io/v3/b/" + BIN_ID;
 /* ================================= */
 
-let myName=localStorage.getItem("myName");
-let myRoom=null;
-let myID=localStorage.getItem("myID")||crypto.randomUUID();
-localStorage.setItem("myID",myID);
-let lastMessageCount={};
+let myID = localStorage.getItem("uid") || crypto.randomUUID();
+localStorage.setItem("uid", myID);
+let myName = localStorage.getItem("name");
+let currentRoom = null;
+let lastCount = {};
+let roomOpen = false;  // track if a chat room is open
 
-/* PIN */
-window.onload=function(){
-const pin=localStorage.getItem("master_pin")||prompt("Create PIN:");
-if(!localStorage.getItem("master_pin")) localStorage.setItem("master_pin",pin);
-if(prompt("Enter PIN:")!==localStorage.getItem("master_pin")){
-document.body.innerHTML="<h1 style='text-align:center;margin-top:50px;'>Locked</h1>";
-}else{
-if(!myName){
-myName=prompt("Enter your name:");
-localStorage.setItem("myName",myName);
-}
-showList();
-}
+/* PIN & NAME */
+let pin = localStorage.getItem("pin") || prompt("Create PIN:");
+if(!localStorage.getItem("pin")) localStorage.setItem("pin", pin);
+if(prompt("Enter PIN:")!==localStorage.getItem("pin")) document.body.innerHTML="<h2 style='text-align:center'>Locked</h2>";
+if(!myName){ myName = prompt("Your name:"); localStorage.setItem("name", myName); }
+
+/* Toggle password input */
+document.getElementById("privateBox").onchange = () => {
+    document.getElementById("room-pass").style.display =
+        document.getElementById("privateBox").checked ? "block" : "none";
 };
 
-/* Screens */
-function hideAll(){document.querySelectorAll(".card").forEach(s=>s.classList.add("hidden"));}
-function showList(){hideAll();document.getElementById("screen-list").classList.remove("hidden");renderRoomList();}
-function showSetup(){hideAll();document.getElementById("screen-setup").classList.remove("hidden");document.getElementById("error-msg").textContent="";}
-function showSettings(){hideAll();document.getElementById("screen-settings").classList.remove("hidden");}
+/* ===== UTILITIES ===== */
+function hideAll(){document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));}
+function showList(){roomOpen=false; hideAll();document.getElementById("screen-list").classList.remove("hidden"); renderRooms();}
+function showSetup(){roomOpen=false; hideAll();document.getElementById("screen-setup").classList.remove("hidden");}
+function formatTime(t){let d=new Date(t);return d.getHours().toString().padStart(2,'0')+":"+d.getMinutes().toString().padStart(2,'0');}
 
-/* JSON */
-async function getData(){const r=await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY}});return (await r.json()).record;}
-async function saveData(d){await fetch(BASE,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":API_KEY},body:JSON.stringify(d)});}
+/* ===== JSONBin ===== */
+async function getData(){ try{ const r = await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY},cache:"no-store"}); return (await r.json()).record; } catch(e){ return {rooms:{}, online:{}}; } }
+async function saveData(d){ try{ await fetch(BASE,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":API_KEY},body:JSON.stringify(d)}); } catch(e){console.log("Save error"); } }
 
-/* Rooms */
-function renderRoomList(){
-let list=document.getElementById("room-list");
-list.innerHTML="";
-let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
-rooms.forEach(r=>{
-let unread=localStorage.getItem("unread_"+r)||0;
-list.innerHTML+=`
-<div class="room-item">
-  <div onclick="openRoom('${r}')">
-    <b># ${r}</b>${unread>0?`<span class="badge">${unread}</span>`:""}
-  </div>
-  <button onclick="deleteLocalRoom('${r}')" style="background:#dc3545;padding:5px 10px;border-radius:10px;">🗑</button>
-</div>`;
-});
+/* ===== RENDER ROOMS ===== */
+async function renderRooms(){
+    let d = await getData();
+    let list = document.getElementById("room-list");
+    list.innerHTML = "";
+    if(!d.rooms) d.rooms={};
+    for(let r in d.rooms){
+        let lock = d.rooms[r].public ? "" : "🔒";
+        let div = document.createElement("div");
+        div.className="room-item";
+        div.innerHTML=`<span># ${r} <span class="lock">${lock}</span></span>`;
+        div.onclick = ()=>openRoom(r);
+        list.appendChild(div);
+    }
+    document.getElementById("global-online").textContent = "Online: "+Object.keys(d.online||{}).length;
 }
 
-function deleteLocalRoom(room){
-if(!confirm("Remove this chat from your list?")) return;
-let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
-rooms=rooms.filter(r=>r!==room);
-localStorage.setItem("saved_rooms",JSON.stringify(rooms));
-localStorage.removeItem("unread_"+room);
-renderRoomList();
+/* ===== CREATE ROOM ===== */
+document.getElementById("createBtn").onclick = async function(evt){
+    evt.preventDefault();
+    let r = document.getElementById("room-name").value.trim();
+    if(!r) return alert("Enter room name");
+    let btn=this; btn.disabled=true; btn.textContent="Creating...";
+    try{
+        let d = await getData(); if(!d.rooms)d.rooms={};
+        if(d.rooms[r]) return alert("Room exists");
+        let priv = document.getElementById("privateBox").checked;
+        let pass = document.getElementById("room-pass").value;
+        d.rooms[r]={owner:myID, ownerName:myName, public:!priv, password:priv?pass:null, messages:[], kicked:{}};
+        await saveData(d);
+        currentRoom=r; lastCount[r]=0;
+        document.getElementById("room-name").value="";
+        document.getElementById("room-pass").value="";
+        document.getElementById("privateBox").checked=false;
+        document.getElementById("room-pass").style.display="none";
+        heartbeat(); openRoom(r);
+    }catch(e){alert("Error creating room"); console.error(e);}
+    finally{btn.disabled=false; btn.textContent="Create";}
 }
 
-/* Create/Join */
-async function createRoom(){
-let room=document.getElementById("room-name").value.trim().toLowerCase();
-if(!room) return;
-let d=await getData(); if(!d.rooms)d.rooms={};
-if(d.rooms[room]) return;
-d.rooms[room]=[]; await saveData(d);
-saveLocal(room); openRoom(room);
-}
-async function joinRoom(){
-let room=document.getElementById("room-name").value.trim().toLowerCase();
-let d=await getData();
-if(!d.rooms||!d.rooms[room]) return;
-saveLocal(room); openRoom(room);
-}
-function saveLocal(r){
-let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
-if(!rooms.includes(r)){rooms.push(r);localStorage.setItem("saved_rooms",JSON.stringify(rooms));}
+/* ===== JOIN ROOM ===== */
+document.getElementById("joinBtn").onclick = async function(evt){
+    evt.preventDefault();
+    let r = document.getElementById("room-name").value.trim();
+    let d = await getData(); if(!d.rooms[r]) return alert("Room not found");
+    if(d.rooms[r].kicked && d.rooms[r].kicked[myID]) return alert("You were kicked");
+    if(!d.rooms[r].public){ let p=prompt("Password:"); if(p!==d.rooms[r].password) return alert("Wrong password"); }
+    currentRoom=r; lastCount[r]=0;
+    heartbeat(); openRoom(r);
 }
 
-/* Chat */
-function openRoom(r){
-myRoom=r;
-lastMessageCount[r]=0;
-localStorage.setItem("unread_"+r,0);
-hideAll();
-document.getElementById("screen-chat").classList.remove("hidden");
-document.getElementById("display-room").textContent=r;
-loadMessages();
-heartbeat();
+/* ===== OPEN ROOM ===== */
+async function openRoom(r){
+    currentRoom=r;
+    roomOpen=true;
+    hideAll(); 
+    document.getElementById("screen-chat").classList.remove("hidden");
+    document.getElementById("room-title").textContent=r;
+    loadMsgs();
 }
 
-/* Messages */
-function checkInput(){document.getElementById("send-btn").disabled=!document.getElementById("message-input").value.trim();}
-async function sendMessage(){
-let text=document.getElementById("message-input").value.trim();
-if(!text) return;
-let d=await getData();
-d.rooms[myRoom].push({user:myName,msg:text,time:Date.now()});
-await saveData(d);
-document.getElementById("message-input").value="";
-checkInput();
-loadMessages();
+/* ===== SEND MESSAGE ===== */
+function checkInput(){document.getElementById("sendBtn").disabled=!document.getElementById("msg").value.trim();}
+async function sendMsg(){
+    let text=document.getElementById("msg").value.trim();
+    if(!text || !roomOpen) return;
+    let d = await getData();
+    d.rooms[currentRoom].messages.push({u:myName,id:myID,m:text,t:Date.now()});
+    await saveData(d);
+    document.getElementById("msg").value=""; checkInput(); loadMsgs();
 }
 
-function formatTime(ts){let d=new Date(ts);return d.getHours().toString().padStart(2,'0')+":"+d.getMinutes().toString().padStart(2,'0');}
+/* ===== LOAD MESSAGES + ADMIN PANEL ===== */
+async function loadMsgs(){
+    if(!roomOpen || !currentRoom) return;  // <-- prevent auto-reset
+    let d = await getData();
+    if(!d.rooms || !d.rooms[currentRoom]){ showList(); return; }
+    let msgs = d.rooms[currentRoom].messages;
+    let box = document.getElementById("chat-box");
+    if(!lastCount[currentRoom]) lastCount[currentRoom]=0;
+    for(let i=lastCount[currentRoom];i<msgs.length;i++){
+        let m = msgs[i];
+        let div=document.createElement("div");
+        div.className="msg "+(m.id===myID?"msg-me":"msg-them");
+        div.innerHTML=`<span class="msg-info">${m.u} ${formatTime(m.t)}</span>${m.m}`;
+        box.appendChild(div);
+    }
+    lastCount[currentRoom]=msgs.length;
+    box.scrollTop=box.scrollHeight;
 
-async function loadMessages(){
-let d=await getData();
-if(!d.rooms||!d.rooms[myRoom]) return;
-let messages=d.rooms[myRoom];
-const box=document.getElementById("chat-box");
-for(let i=lastMessageCount[myRoom]||0;i<messages.length;i++){
-let m=messages[i];
-let div=document.createElement("div");
-div.className="msg "+(m.user===myName?"msg-me":"msg-them");
-div.innerHTML=`<span class="msg-info">${m.user} ${formatTime(m.time)}</span>${m.msg}`;
-box.appendChild(div);
-}
-lastMessageCount[myRoom]=messages.length;
-box.scrollTop=box.scrollHeight;
+    /* ADMIN PANEL */
+    let admin=document.getElementById("admin-panel");
+    if(d.rooms[currentRoom].owner===myID){
+        admin.classList.remove("hidden");
+        let users={}; msgs.forEach(m=>users[m.id]=m.u);
+        let usersHTML="";
+        for(let id in users){ if(id!==myID) usersHTML+=`<div class="user-item">${users[id]} <button onclick="kickUser('${id}')">Kick</button></div>`;}
+        admin.innerHTML=`<b>Admin Panel</b><br>
+        <button onclick="deleteRoom()">Delete Room</button>
+        <button onclick="togglePrivacy()">Toggle Public/Private</button>
+        <div style="margin-top:5px;"><b>Users:</b>${usersHTML}</div>`;
+    } else { admin.classList.add("hidden"); }
 
-/* Update unread counts for rooms not open */
-let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
-for(let r of rooms){
-if(r!==myRoom){
-let old=lastMessageCount[r]||0;
-let count=(messages.length - old);
-if(count>0) localStorage.setItem("unread_"+r,count);
-}
-}
-renderRoomList();
+    /* Online count */
+    let count=0; for(let id in d.online){if(d.online[id].room===currentRoom) count++;}
+    document.getElementById("room-online").textContent="Online: "+count;
 }
 
-/* Settings */
-function resetName(){localStorage.removeItem("myName");alert("Reload to set new name");}
-function resetPIN(){localStorage.removeItem("master_pin");alert("Reload to set new PIN");}
-function clearRooms(){localStorage.removeItem("saved_rooms");alert("Cleared");renderRoomList();}
+/* ===== ADMIN ACTIONS ===== */
+async function deleteRoom(){
+    if(!confirm("Delete room for everyone?")) return;
+    let d = await getData();
+    delete d.rooms[currentRoom];
+    await saveData(d);
+    showList();
+}
+async function togglePrivacy(){
+    let d = await getData();
+    let room=d.rooms[currentRoom];
+    if(room.public){ let p=prompt("Set password:"); if(!p) return; room.public=false; room.password=p; }
+    else{ room.public=true; room.password=null; }
+    await saveData(d); alert("Updated");
+}
+async function kickUser(id){
+    let d = await getData(); d.rooms[currentRoom].kicked[id]=true; await saveData(d); alert("User kicked"); showList();
+}
 
-/* Online */
+/* ===== ONLINE HEARTBEAT ===== */
 async function heartbeat(){
-let d=await getData(); if(!d.online)d.online={};
-d.online[myID]={room:myRoom,time:Date.now()};
-for(let id in d.online){if(Date.now()-d.online[id].time>20000) delete d.online[id];}
-await saveData(d);
-document.getElementById("global-online").textContent="Online: "+Object.keys(d.online).length;
-let count=0; for(let id in d.online){if(d.online[id].room===myRoom) count++;}
-document.getElementById("room-online").textContent="Online: "+count;
+    if(!roomOpen || !currentRoom) return; // only update online if in a room
+    let d = await getData(); if(!d.online) d.online={};
+    d.online[myID]={room:currentRoom,time:Date.now()};
+    for(let id in d.online){ if(Date.now()-d.online[id].time>20000) delete d.online[id]; }
+    await saveData(d);
 }
 
-/* Intervals */
-setInterval(loadMessages,2000);
-setInterval(heartbeat,10000);
+// Update messages and heartbeat only when room is open
+setInterval(() => { if(roomOpen) loadMsgs(); },2000);
+setInterval(() => { if(roomOpen) heartbeat(); },10000);
+
+showList();
 </script>
 </body>
 </html>
