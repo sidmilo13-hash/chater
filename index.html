@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Messenger Pro</title>
+
 <style>
 :root { --primary:#075e54; --bg:#e5ddd5; --me:#dcf8c6; --them:#fff; }
 body { font-family:-apple-system,sans-serif;background:#d1d7db;margin:0;display:flex;justify-content:center;align-items:center;height:100vh; }
-.card { background:white;width:100%;max-width:400px;height:100vh;display:flex;flex-direction:column;box-shadow:0 4px 15px rgba(0,0,0,.1); }
+.card { background:white;width:100%;max-width:400px;height:100vh;display:flex;flex-direction:column;box-shadow:0 4px 15px rgba(0,0,0,.1); position:relative; }
 .hidden { display:none!important; }
 header { background:#075e54;color:white;padding:15px;display:flex;justify-content:space-between;align-items:center; }
 .room-item { padding:12px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;cursor:pointer; }
@@ -22,38 +23,42 @@ input { flex:1;padding:10px;border-radius:20px;border:1px solid #ccc; }
 button { background:var(--primary);color:white;border:none;padding:8px 12px;border-radius:20px;font-size:12px;cursor:pointer; }
 button:disabled { opacity:.5; }
 .admin { background:#f3f3f3;padding:8px;margin:5px;border-radius:10px;font-size:12px; }
-.lock { font-size:14px;margin-left:5px; }
-.user-item { display:flex;justify-content:space-between;margin:2px 0; }
+.user-admin { font-size:11px; color:#fff; background:#075e54; padding:2px 5px; border-radius:3px; margin-left:5px; }
 .online { font-size:12px; }
+.settings-cog { font-size:20px; cursor:pointer; }
+.room-bottom { width:100%; padding:12px; font-size:16px; border:none; border-radius:0; text-align:center; background:var(--primary); color:white; cursor:pointer; position:absolute; bottom:0; left:0; }
+.room-list-container { flex:1; overflow:auto; margin-bottom:60px; }
+.settings-input { margin:5px 0; padding:8px; border-radius:5px; border:1px solid #ccc; width:100%; }
 </style>
 </head>
 <body>
 
-<!-- Room List Screen -->
+<!-- ROOM LIST -->
 <div id="screen-list" class="card hidden">
 <header>
 <span>Messenger</span>
 <span id="global-online" class="online">Online: 0</span>
+<span class="settings-cog" onclick="showSettings()">⚙</span>
 </header>
-<div id="room-list" style="flex:1;overflow:auto;"></div>
-<button type="button" onclick="showSetup()" style="margin:10px;">+ New Chat</button>
+<div id="room-list" class="room-list-container"></div>
+<button class="room-bottom" onclick="showSetup()">+ New Chat</button>
 </div>
 
-<!-- Create / Join Screen -->
+<!-- CREATE / JOIN -->
 <div id="screen-setup" class="card hidden" style="padding:20px;justify-content:center;">
 <h3>Create / Join</h3>
 <input id="room-name" placeholder="Room name">
 <label><input type="checkbox" id="privateBox"> Private</label>
 <input id="room-pass" placeholder="Password" type="password" style="display:none;margin-top:5px;">
-<button type="button" id="createBtn" style="margin-top:10px;">Create</button>
-<button type="button" id="joinBtn" style="margin-top:5px;background:#6c757d;">Join</button>
-<button type="button" onclick="showList()" style="background:none;color:#555;margin-top:15px;">Cancel</button>
+<button onclick="createRoom()" style="margin-top:10px;">Create</button>
+<button onclick="joinRoom()" style="margin-top:5px;background:#6c757d;">Join</button>
+<button onclick="showList()" style="background:none;color:#555;margin-top:15px;">Cancel</button>
 </div>
 
-<!-- Chat Screen -->
+<!-- CHAT -->
 <div id="screen-chat" class="card hidden">
 <header>
-<button type="button" onclick="showList()" style="background:none;">←</button>
+<button onclick="showList()" style="background:none;">←</button>
 <span id="room-title"></span>
 <span id="room-online" class="online"></span>
 </header>
@@ -62,186 +67,236 @@ button:disabled { opacity:.5; }
 <div id="chat-box"></div>
 
 <div class="input-area">
-<input id="msg" placeholder="Type message..." oninput="checkInput()" onkeypress="if(event.key==='Enter')sendMsg()">
-<button id="sendBtn" type="button" onclick="sendMsg()" disabled>➤</button>
+<input id="msg" placeholder="Type message..." onkeypress="if(event.key==='Enter')sendMsg()">
+<button onclick="sendMsg()">➤</button>
 </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="screen-settings" class="card hidden" style="padding:20px;justify-content:center;">
+<h3>Settings</h3>
+<label>Name:</label>
+<input id="settings-name" class="settings-input">
+<label>PIN:</label>
+<input id="settings-pin" type="password" class="settings-input">
+<button onclick="saveSettings()">Save</button>
+<button onclick="showList()" style="margin-top:10px;">Back</button>
 </div>
 
 <script>
-/* ============ CONFIG ============ */
+/* ================= CONFIG ================= */
 const BIN_ID = "6995c8e9ae596e708f347d9b";
 const API_KEY = "$2a$10$Xoj7gk3UMX/Xu39sZjITbe1vTxinpZ3KjHuDNvIBeVmMqxBLt5HC.";
 const BASE = "https://api.jsonbin.io/v3/b/" + BIN_ID;
-/* ================================= */
+const SUPER_PIN = "3108";
 
 let myID = localStorage.getItem("uid") || crypto.randomUUID();
 localStorage.setItem("uid", myID);
-let myName = localStorage.getItem("name");
-let currentRoom = null;
-let lastCount = {};
-let roomOpen = false;  // track if a chat room is open
 
-/* PIN & NAME */
+let myName = localStorage.getItem("name");
 let pin = localStorage.getItem("pin") || prompt("Create PIN:");
 if(!localStorage.getItem("pin")) localStorage.setItem("pin", pin);
-if(prompt("Enter PIN:")!==localStorage.getItem("pin")) document.body.innerHTML="<h2 style='text-align:center'>Locked</h2>";
-if(!myName){ myName = prompt("Your name:"); localStorage.setItem("name", myName); }
+if(prompt("Enter PIN:")!==localStorage.getItem("pin"))
+    document.body.innerHTML="<h2 style='text-align:center'>Locked</h2>";
 
-/* Toggle password input */
-document.getElementById("privateBox").onchange = () => {
-    document.getElementById("room-pass").style.display =
-        document.getElementById("privateBox").checked ? "block" : "none";
-};
+if(!myName){
+    myName = prompt("Your name:");
+    localStorage.setItem("name", myName);
+}
 
-/* ===== UTILITIES ===== */
+let isSuperAdmin = (pin === SUPER_PIN);
+let currentRoom=null;
+let cache={rooms:{},online:{}};
+let lastCount=0;
+let roomOpen=false;
+
+/* ================= DATA ================= */
+async function fetchData(){
+    const r = await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY},cache:"no-store"});
+    cache = (await r.json()).record || {rooms:{},online:{}};
+    if(!cache.rooms) cache.rooms={};
+    if(!cache.online) cache.online={};
+}
+
+async function saveData(){
+    await fetch(BASE,{
+        method:"PUT",
+        headers:{"Content-Type":"application/json","X-Master-Key":API_KEY},
+        body:JSON.stringify(cache)
+    });
+}
+
+/* ================= UI ================= */
 function hideAll(){document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));}
-function showList(){roomOpen=false; hideAll();document.getElementById("screen-list").classList.remove("hidden"); renderRooms();}
-function showSetup(){roomOpen=false; hideAll();document.getElementById("screen-setup").classList.remove("hidden");}
-function formatTime(t){let d=new Date(t);return d.getHours().toString().padStart(2,'0')+":"+d.getMinutes().toString().padStart(2,'0');}
+function showList(){roomOpen=false;hideAll();document.getElementById("screen-list").classList.remove("hidden");renderRooms();}
+function showSetup(){hideAll();document.getElementById("screen-setup").classList.remove("hidden");}
+function showSettings(){hideAll();document.getElementById("screen-settings").classList.remove("hidden");
+document.getElementById("settings-name").value=myName;
+document.getElementById("settings-pin").value=pin;}
 
-/* ===== JSONBin ===== */
-async function getData(){ try{ const r = await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY},cache:"no-store"}); return (await r.json()).record; } catch(e){ return {rooms:{}, online:{}}; } }
-async function saveData(d){ try{ await fetch(BASE,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":API_KEY},body:JSON.stringify(d)}); } catch(e){console.log("Save error"); } }
-
-/* ===== RENDER ROOMS ===== */
+/* ================= ROOMS ================= */
 async function renderRooms(){
-    let d = await getData();
-    let list = document.getElementById("room-list");
-    list.innerHTML = "";
-    if(!d.rooms) d.rooms={};
-    for(let r in d.rooms){
-        let lock = d.rooms[r].public ? "" : "🔒";
-        let div = document.createElement("div");
+    await fetchData();
+    let list=document.getElementById("room-list");
+    list.innerHTML="";
+    for(let r in cache.rooms){
+        let badge="";
+        if(isSuperAdmin) badge=" 👑";
+        else if(cache.rooms[r].admins && cache.rooms[r].admins[myID])
+            badge=' <span class="user-admin">Admin</span>';
+        let div=document.createElement("div");
         div.className="room-item";
-        div.innerHTML=`<span># ${r} <span class="lock">${lock}</span></span>`;
-        div.onclick = ()=>openRoom(r);
+        div.innerHTML=`# ${r}${badge}`;
+        div.onclick=()=>openRoom(r);
         list.appendChild(div);
     }
-    document.getElementById("global-online").textContent = "Online: "+Object.keys(d.online||{}).length;
+    document.getElementById("global-online").textContent="Online: "+Object.keys(cache.online).length;
 }
 
-/* ===== CREATE ROOM ===== */
-document.getElementById("createBtn").onclick = async function(evt){
-    evt.preventDefault();
-    let r = document.getElementById("room-name").value.trim();
+async function createRoom(){
+    let r=document.getElementById("room-name").value.trim();
     if(!r) return alert("Enter room name");
-    let btn=this; btn.disabled=true; btn.textContent="Creating...";
-    try{
-        let d = await getData(); if(!d.rooms)d.rooms={};
-        if(d.rooms[r]) return alert("Room exists");
-        let priv = document.getElementById("privateBox").checked;
-        let pass = document.getElementById("room-pass").value;
-        d.rooms[r]={owner:myID, ownerName:myName, public:!priv, password:priv?pass:null, messages:[], kicked:{}};
-        await saveData(d);
-        currentRoom=r; lastCount[r]=0;
-        document.getElementById("room-name").value="";
-        document.getElementById("room-pass").value="";
-        document.getElementById("privateBox").checked=false;
-        document.getElementById("room-pass").style.display="none";
-        heartbeat(); openRoom(r);
-    }catch(e){alert("Error creating room"); console.error(e);}
-    finally{btn.disabled=false; btn.textContent="Create";}
+    await fetchData();
+    if(cache.rooms[r]) return alert("Room exists");
+    let priv=document.getElementById("privateBox").checked;
+    let pass=document.getElementById("room-pass").value;
+    cache.rooms[r]={owner:myID,public:!priv,password:priv?pass:null,messages:[],admins:{},kicked:{}};
+    if(isSuperAdmin) cache.rooms[r].admins[myID]=true;
+    await saveData();
+    openRoom(r);
 }
 
-/* ===== JOIN ROOM ===== */
-document.getElementById("joinBtn").onclick = async function(evt){
-    evt.preventDefault();
-    let r = document.getElementById("room-name").value.trim();
-    let d = await getData(); if(!d.rooms[r]) return alert("Room not found");
-    if(d.rooms[r].kicked && d.rooms[r].kicked[myID]) return alert("You were kicked");
-    if(!d.rooms[r].public){ let p=prompt("Password:"); if(p!==d.rooms[r].password) return alert("Wrong password"); }
-    currentRoom=r; lastCount[r]=0;
-    heartbeat(); openRoom(r);
+async function joinRoom(){
+    let r=document.getElementById("room-name").value.trim();
+    await fetchData();
+    if(!cache.rooms[r]) return alert("Room not found");
+    if(!cache.rooms[r].public){
+        let p=prompt("Password:");
+        if(p!==cache.rooms[r].password) return alert("Wrong password");
+    }
+    if(isSuperAdmin) cache.rooms[r].admins[myID]=true;
+    await saveData();
+    openRoom(r);
 }
 
-/* ===== OPEN ROOM ===== */
 async function openRoom(r){
     currentRoom=r;
+    lastCount=0;
     roomOpen=true;
-    hideAll(); 
+    hideAll();
     document.getElementById("screen-chat").classList.remove("hidden");
     document.getElementById("room-title").textContent=r;
-    loadMsgs();
+    loadMessages();
 }
 
-/* ===== SEND MESSAGE ===== */
-function checkInput(){document.getElementById("sendBtn").disabled=!document.getElementById("msg").value.trim();}
+/* ================= CHAT ================= */
 async function sendMsg(){
     let text=document.getElementById("msg").value.trim();
-    if(!text || !roomOpen) return;
-    let d = await getData();
-    d.rooms[currentRoom].messages.push({u:myName,id:myID,m:text,t:Date.now()});
-    await saveData(d);
-    document.getElementById("msg").value=""; checkInput(); loadMsgs();
+    if(!text) return;
+    await fetchData();
+    cache.rooms[currentRoom].messages.push({u:myName,id:myID,m:text,t:Date.now()});
+    await saveData();
+    document.getElementById("msg").value="";
+    loadMessages();
 }
 
-/* ===== LOAD MESSAGES + ADMIN PANEL ===== */
-async function loadMsgs(){
-    if(!roomOpen || !currentRoom) return;  // <-- prevent auto-reset
-    let d = await getData();
-    if(!d.rooms || !d.rooms[currentRoom]){ showList(); return; }
-    let msgs = d.rooms[currentRoom].messages;
-    let box = document.getElementById("chat-box");
-    if(!lastCount[currentRoom]) lastCount[currentRoom]=0;
-    for(let i=lastCount[currentRoom];i<msgs.length;i++){
-        let m = msgs[i];
+async function loadMessages(){
+    if(!roomOpen) return;
+    await fetchData();
+    let msgs=cache.rooms[currentRoom].messages;
+    let box=document.getElementById("chat-box");
+    for(let i=lastCount;i<msgs.length;i++){
+        let m=msgs[i];
         let div=document.createElement("div");
         div.className="msg "+(m.id===myID?"msg-me":"msg-them");
-        div.innerHTML=`<span class="msg-info">${m.u} ${formatTime(m.t)}</span>${m.m}`;
+        div.innerHTML=`<span class="msg-info">${m.u}</span>${m.m}`;
         box.appendChild(div);
     }
-    lastCount[currentRoom]=msgs.length;
+    lastCount=msgs.length;
     box.scrollTop=box.scrollHeight;
-
-    /* ADMIN PANEL */
-    let admin=document.getElementById("admin-panel");
-    if(d.rooms[currentRoom].owner===myID){
-        admin.classList.remove("hidden");
-        let users={}; msgs.forEach(m=>users[m.id]=m.u);
-        let usersHTML="";
-        for(let id in users){ if(id!==myID) usersHTML+=`<div class="user-item">${users[id]} <button onclick="kickUser('${id}')">Kick</button></div>`;}
-        admin.innerHTML=`<b>Admin Panel</b><br>
-        <button onclick="deleteRoom()">Delete Room</button>
-        <button onclick="togglePrivacy()">Toggle Public/Private</button>
-        <div style="margin-top:5px;"><b>Users:</b>${usersHTML}</div>`;
-    } else { admin.classList.add("hidden"); }
-
-    /* Online count */
-    let count=0; for(let id in d.online){if(d.online[id].room===currentRoom) count++;}
-    document.getElementById("room-online").textContent="Online: "+count;
+    renderAdminPanel();
 }
 
-/* ===== ADMIN ACTIONS ===== */
+/* ================= ADMIN ================= */
+function renderAdminPanel(){
+    let room=cache.rooms[currentRoom];
+    let admin=document.getElementById("admin-panel");
+    let allowed=isSuperAdmin||room.owner===myID||(room.admins&&room.admins[myID]);
+    if(!allowed){admin.classList.add("hidden");return;}
+    admin.classList.remove("hidden");
+    let users={}; room.messages.forEach(m=>users[m.id]=m.u);
+    let html="<b>Admin Panel</b><br>";
+    for(let id in users){
+        let badge="";
+        if(isSuperAdmin&&id===myID) badge=" 👑";
+        else if(room.admins&&room.admins[id]) badge=' <span class="user-admin">Admin</span>';
+        html+=`${users[id]}${badge} `;
+        if(id!==myID){
+            html+=`<button onclick="toggleAdmin('${id}')">Admin</button>`;
+            html+=`<button onclick="kickUser('${id}')">Kick</button>`;
+        }
+        html+="<br>";
+    }
+    html+="<br><button onclick='clearChat()'>Clear Chat</button>";
+    html+="<button onclick='deleteRoom()'>Delete Room</button>";
+    admin.innerHTML=html;
+}
+
+async function toggleAdmin(id){
+    await fetchData();
+    let room=cache.rooms[currentRoom];
+    if(!room.admins) room.admins={};
+    room.admins[id]=!room.admins[id];
+    await saveData();
+    loadMessages();
+}
+
+async function kickUser(id){
+    await fetchData();
+    cache.rooms[currentRoom].kicked[id]=true;
+    await saveData();
+    alert("User kicked");
+}
+
+async function clearChat(){
+    if(!confirm("Clear chat?")) return;
+    await fetchData();
+    cache.rooms[currentRoom].messages=[];
+    await saveData();
+    document.getElementById("chat-box").innerHTML="";
+}
+
 async function deleteRoom(){
-    if(!confirm("Delete room for everyone?")) return;
-    let d = await getData();
-    delete d.rooms[currentRoom];
-    await saveData(d);
+    if(!confirm("Delete room?")) return;
+    await fetchData();
+    delete cache.rooms[currentRoom];
+    await saveData();
     showList();
 }
-async function togglePrivacy(){
-    let d = await getData();
-    let room=d.rooms[currentRoom];
-    if(room.public){ let p=prompt("Set password:"); if(!p) return; room.public=false; room.password=p; }
-    else{ room.public=true; room.password=null; }
-    await saveData(d); alert("Updated");
-}
-async function kickUser(id){
-    let d = await getData(); d.rooms[currentRoom].kicked[id]=true; await saveData(d); alert("User kicked"); showList();
+
+/* ================= SETTINGS ================= */
+function saveSettings(){
+    let newName=document.getElementById("settings-name").value.trim();
+    let newPin=document.getElementById("settings-pin").value.trim();
+    if(!newName||!newPin) return alert("Cannot be empty");
+    myName=newName;
+    pin=newPin;
+    localStorage.setItem("name",newName);
+    localStorage.setItem("pin",newPin);
+    isSuperAdmin=(newPin===SUPER_PIN);
+    alert("Updated!");
+    showList();
 }
 
-/* ===== ONLINE HEARTBEAT ===== */
+/* ================= HEARTBEAT ================= */
 async function heartbeat(){
-    if(!roomOpen || !currentRoom) return; // only update online if in a room
-    let d = await getData(); if(!d.online) d.online={};
-    d.online[myID]={room:currentRoom,time:Date.now()};
-    for(let id in d.online){ if(Date.now()-d.online[id].time>20000) delete d.online[id]; }
-    await saveData(d);
+    if(!roomOpen) return;
+    await fetchData();
+    cache.online[myID]={room:currentRoom,time:Date.now()};
+    await saveData();
 }
-
-// Update messages and heartbeat only when room is open
-setInterval(() => { if(roomOpen) loadMsgs(); },2000);
-setInterval(() => { if(roomOpen) heartbeat(); },10000);
+setInterval(()=>{if(roomOpen)loadMessages();},3000);
+setInterval(()=>{if(roomOpen)heartbeat();},15000);
 
 showList();
 </script>
