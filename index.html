@@ -2,63 +2,85 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Messenger Pro Online</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Messenger Pro</title>
 <style>
-:root { --primary:#075e54; --bg:#e5ddd5; --me:#dcf8c6; --them:#ffffff; }
+:root { --primary:#075e54; --bg:#e5ddd5; --me:#dcf8c6; --them:#fff; }
 body { font-family:-apple-system,sans-serif;background:#d1d7db;margin:0;display:flex;justify-content:center;align-items:center;height:100vh; }
-.card { background:white;width:100%;max-width:400px;height:100vh;display:flex;flex-direction:column;box-shadow:0 4px 15px rgba(0,0,0,0.1); }
+.card { background:white;width:100%;max-width:400px;height:100vh;display:flex;flex-direction:column;box-shadow:0 4px 15px rgba(0,0,0,.1); }
 .hidden { display:none!important; }
-
 header { background:#075e54;color:white;padding:15px;display:flex;justify-content:space-between;align-items:center; }
-
-.room-item { padding:15px;border-bottom:1px solid #eee;cursor:pointer;display:flex;justify-content:space-between;align-items:center; }
+.room-item { padding:10px 15px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center; }
 .room-item:hover { background:#f5f5f5; }
-
+.room-item div { flex:1; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
 #chat-box { flex:1;overflow-y:auto;padding:15px;background:var(--bg);display:flex;flex-direction:column; }
-.msg { margin:5px 0;padding:10px 15px;border-radius:15px;max-width:75%;font-size:15px;box-shadow:0 1px 1px rgba(0,0,0,0.1);position:relative; }
-.msg-me { align-self:flex-end;background:var(--me);border-bottom-right-radius:2px; }
-.msg-them { align-self:flex-start;background:var(--them);border-bottom-left-radius:2px; }
+.msg { margin:5px 0;padding:10px 15px;border-radius:15px;max-width:75%;font-size:15px;box-shadow:0 1px 1px rgba(0,0,0,.1); position:relative; }
+.msg-me { align-self:flex-end;background:var(--me); }
+.msg-them { align-self:flex-start;background:var(--them); }
 .msg-info { font-size:10px;color:#777;margin-bottom:4px;display:block; }
-
 input { width:100%;padding:12px;border:1px solid #ccc;border-radius:25px;outline:none; }
 .input-area { padding:10px;background:#f0f0f0;display:flex;gap:10px;align-items:center; }
 button { background:var(--primary);color:white;border:none;padding:10px 20px;border-radius:20px;cursor:pointer;font-weight:bold; }
+button.secondary { background:#6c757d; }
+button.danger { background:#dc3545; }
+button:disabled { opacity:.5; }
+.setting-btn { margin:10px 15px; }
+.online { font-size:12px;opacity:.9; }
+.error { color:red;font-size:12px;text-align:center;margin-top:5px; }
+.badge { background:red;color:white;border-radius:50%;font-size:10px;width:18px;height:18px;text-align:center;line-height:18px;margin-left:5px; }
 </style>
 </head>
 <body>
 
-<!-- SCREEN 1 -->
+<!-- ROOM LIST -->
 <div id="screen-list" class="card">
 <header>
 <span>Messenger</span>
-<button onclick="showCreateRoom()" style="background:rgba(255,255,255,0.2)">+ New</button>
+<div>
+<span id="global-online" class="online">Online: 0</span>
+<button onclick="showSettings()" style="margin-left:10px;background:#333;">⚙</button>
+</div>
 </header>
 <div id="room-list" style="flex:1;overflow-y:auto;"></div>
+<button onclick="showSetup()" style="margin:15px;">+ New Chat</button>
 </div>
 
-<!-- SCREEN 2 -->
+<!-- SETUP -->
 <div id="screen-setup" class="card hidden" style="justify-content:center;padding:20px;">
-<h2>Join or Create</h2>
-<input id="user-name" placeholder="Your Name">
+<h2>Create or Join</h2>
 <input id="room-name" placeholder="Room Name">
-<button onclick="enterRoom()" style="width:100%;margin-top:10px;">Enter Room</button>
+<button onclick="createRoom()" style="width:100%;margin-top:10px;">Create Room</button>
+<button onclick="joinRoom()" class="secondary" style="width:100%;margin-top:10px;">Join Room</button>
 <button onclick="showList()" style="background:none;color:#666;margin-top:20px;">Cancel</button>
+<div id="error-msg" class="error"></div>
 </div>
 
-<!-- SCREEN 3 -->
+<!-- CHAT -->
 <div id="screen-chat" class="card hidden">
 <header>
 <button onclick="showList()" style="background:none;">←</button>
-<span id="display-room">Room</span>
-<span style="font-size:12px;">Cloud Sync</span>
+<span id="display-room"></span>
+<span id="room-online" class="online">Online: 0</span>
 </header>
 <div id="chat-box"></div>
 <div class="input-area">
-<input id="message-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter')sendMessage()">
-<button onclick="sendMessage()" style="background:#25d366;width:50px;border-radius:50%;">➤</button>
+<input id="message-input" placeholder="Type message..."
+oninput="checkInput()" 
+onkeypress="if(event.key==='Enter')sendMessage()">
+<button id="send-btn" onclick="sendMessage()" disabled style="background:#25d366;width:50px;border-radius:50%;">➤</button>
 </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="screen-settings" class="card hidden">
+<header>
+<button onclick="showList()" style="background:none;">←</button>
+<span>Settings</span>
+<span></span>
+</header>
+<button class="setting-btn" onclick="resetName()">Reset Name</button>
+<button class="setting-btn" onclick="resetPIN()">Reset PIN</button>
+<button class="setting-btn danger" onclick="clearRooms()">Clear Saved Rooms</button>
 </div>
 
 <script>
@@ -68,134 +90,156 @@ const API_KEY = "$2a$10$yfzcDWcZY6VdYg.R4RkmS.8mmppM2hyJrou3Jmn2ymiYT5f0B7CR6";
 const BASE = "https://api.jsonbin.io/v3/b/" + "69956e3c43b1c97be987d4e6";
 /* ================================= */
 
-let myName, myRoom;
+let myName=localStorage.getItem("myName");
+let myRoom=null;
+let myID=localStorage.getItem("myID")||crypto.randomUUID();
+localStorage.setItem("myID",myID);
+let lastMessageCount={};
 
-/* ============ PIN SYSTEM ============ */
-window.onload = function(){
-const pin = localStorage.getItem("master_pin") || prompt("Create a Master PIN:");
+/* PIN */
+window.onload=function(){
+const pin=localStorage.getItem("master_pin")||prompt("Create PIN:");
 if(!localStorage.getItem("master_pin")) localStorage.setItem("master_pin",pin);
-if(prompt("Enter PIN:") !== localStorage.getItem("master_pin")){
+if(prompt("Enter PIN:")!==localStorage.getItem("master_pin")){
 document.body.innerHTML="<h1 style='text-align:center;margin-top:50px;'>Locked</h1>";
 }else{
+if(!myName){
+myName=prompt("Enter your name:");
+localStorage.setItem("myName",myName);
+}
 showList();
 }
 };
 
-/* ============ SCREEN CONTROL ============ */
-function showList(){
-document.querySelectorAll('.card').forEach(s=>s.classList.add('hidden'));
-document.getElementById('screen-list').classList.remove('hidden');
-renderRoomList();
-}
+/* Screens */
+function hideAll(){document.querySelectorAll(".card").forEach(s=>s.classList.add("hidden"));}
+function showList(){hideAll();document.getElementById("screen-list").classList.remove("hidden");renderRoomList();}
+function showSetup(){hideAll();document.getElementById("screen-setup").classList.remove("hidden");document.getElementById("error-msg").textContent="";}
+function showSettings(){hideAll();document.getElementById("screen-settings").classList.remove("hidden");}
 
-function showCreateRoom(){
-document.querySelectorAll('.card').forEach(s=>s.classList.add('hidden'));
-document.getElementById('screen-setup').classList.remove('hidden');
-}
+/* JSON */
+async function getData(){const r=await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY}});return (await r.json()).record;}
+async function saveData(d){await fetch(BASE,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":API_KEY},body:JSON.stringify(d)});}
 
+/* Rooms */
 function renderRoomList(){
-const listDiv=document.getElementById('room-list');
-listDiv.innerHTML="";
-const rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
-rooms.forEach(room=>{
-listDiv.innerHTML+=`
-<div class="room-item" onclick="quickEnter('${room}')">
-<b># ${room}</b>
-<span style="color:#999;font-size:12px;">Cloud History</span>
+let list=document.getElementById("room-list");
+list.innerHTML="";
+let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
+rooms.forEach(r=>{
+let unread=localStorage.getItem("unread_"+r)||0;
+list.innerHTML+=`
+<div class="room-item">
+  <div onclick="openRoom('${r}')">
+    <b># ${r}</b>${unread>0?`<span class="badge">${unread}</span>`:""}
+  </div>
+  <button onclick="deleteLocalRoom('${r}')" style="background:#dc3545;padding:5px 10px;border-radius:10px;">🗑</button>
 </div>`;
 });
 }
 
-function quickEnter(room){
-myRoom=room;
-myName=prompt("Enter your name:");
-if(!myName) return;
-openChat();
-}
-
-/* ============ JSONBIN ============ */
-
-async function getData(){
-const res=await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY}});
-const data=await res.json();
-return data.record;
-}
-
-async function saveData(data){
-await fetch(BASE,{
-method:"PUT",
-headers:{
-"Content-Type":"application/json",
-"X-Master-Key":API_KEY
-},
-body:JSON.stringify(data)
-});
-}
-
-/* ============ CHAT ============ */
-
-function enterRoom(){
-myName=document.getElementById('user-name').value.trim();
-myRoom=document.getElementById('room-name').value.trim().toLowerCase();
-if(!myName||!myRoom) return alert("Fill in fields!");
-
+function deleteLocalRoom(room){
+if(!confirm("Remove this chat from your list?")) return;
 let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
-if(!rooms.includes(myRoom)){
-rooms.push(myRoom);
+rooms=rooms.filter(r=>r!==room);
 localStorage.setItem("saved_rooms",JSON.stringify(rooms));
-}
-openChat();
+localStorage.removeItem("unread_"+room);
+renderRoomList();
 }
 
-function openChat(){
-document.querySelectorAll('.card').forEach(s=>s.classList.add('hidden'));
-document.getElementById('screen-chat').classList.remove('hidden');
-document.getElementById('display-room').textContent=myRoom;
+/* Create/Join */
+async function createRoom(){
+let room=document.getElementById("room-name").value.trim().toLowerCase();
+if(!room) return;
+let d=await getData(); if(!d.rooms)d.rooms={};
+if(d.rooms[room]) return;
+d.rooms[room]=[]; await saveData(d);
+saveLocal(room); openRoom(room);
+}
+async function joinRoom(){
+let room=document.getElementById("room-name").value.trim().toLowerCase();
+let d=await getData();
+if(!d.rooms||!d.rooms[room]) return;
+saveLocal(room); openRoom(room);
+}
+function saveLocal(r){
+let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
+if(!rooms.includes(r)){rooms.push(r);localStorage.setItem("saved_rooms",JSON.stringify(rooms));}
+}
+
+/* Chat */
+function openRoom(r){
+myRoom=r;
+lastMessageCount[r]=0;
+localStorage.setItem("unread_"+r,0);
+hideAll();
+document.getElementById("screen-chat").classList.remove("hidden");
+document.getElementById("display-room").textContent=r;
 loadMessages();
+heartbeat();
 }
 
+/* Messages */
+function checkInput(){document.getElementById("send-btn").disabled=!document.getElementById("message-input").value.trim();}
 async function sendMessage(){
-const input=document.getElementById('message-input');
-if(!input.value.trim()) return;
-
-let data=await getData();
-if(!data.rooms) data.rooms={};
-if(!data.rooms[myRoom]) data.rooms[myRoom]=[];
-
-data.rooms[myRoom].push({
-user:myName,
-msg:input.value,
-time:Date.now()
-});
-
-await saveData(data);
-input.value="";
+let text=document.getElementById("message-input").value.trim();
+if(!text) return;
+let d=await getData();
+d.rooms[myRoom].push({user:myName,msg:text,time:Date.now()});
+await saveData(d);
+document.getElementById("message-input").value="";
+checkInput();
 loadMessages();
 }
+
+function formatTime(ts){let d=new Date(ts);return d.getHours().toString().padStart(2,'0')+":"+d.getMinutes().toString().padStart(2,'0');}
 
 async function loadMessages(){
-let data=await getData();
-const box=document.getElementById('chat-box');
-box.innerHTML="";
-if(!data.rooms||!data.rooms[myRoom]) return;
-
-data.rooms[myRoom].forEach(item=>{
-const type=item.user===myName?'msg-me':'msg-them';
-renderMessage(item.user,item.msg,type);
-});
-}
-
-function renderMessage(user,msg,type){
-const box=document.getElementById('chat-box');
-const div=document.createElement('div');
-div.className=`msg ${type}`;
-div.innerHTML=`<span class="msg-info">${user}</span>${msg}`;
+let d=await getData();
+if(!d.rooms||!d.rooms[myRoom]) return;
+let messages=d.rooms[myRoom];
+const box=document.getElementById("chat-box");
+for(let i=lastMessageCount[myRoom]||0;i<messages.length;i++){
+let m=messages[i];
+let div=document.createElement("div");
+div.className="msg "+(m.user===myName?"msg-me":"msg-them");
+div.innerHTML=`<span class="msg-info">${m.user} ${formatTime(m.time)}</span>${m.msg}`;
 box.appendChild(div);
+}
+lastMessageCount[myRoom]=messages.length;
 box.scrollTop=box.scrollHeight;
+
+/* Update unread counts for rooms not open */
+let rooms=JSON.parse(localStorage.getItem("saved_rooms")||"[]");
+for(let r of rooms){
+if(r!==myRoom){
+let old=lastMessageCount[r]||0;
+let count=(messages.length - old);
+if(count>0) localStorage.setItem("unread_"+r,count);
+}
+}
+renderRoomList();
 }
 
-/* Auto refresh */
-setInterval(loadMessages,3000);
+/* Settings */
+function resetName(){localStorage.removeItem("myName");alert("Reload to set new name");}
+function resetPIN(){localStorage.removeItem("master_pin");alert("Reload to set new PIN");}
+function clearRooms(){localStorage.removeItem("saved_rooms");alert("Cleared");renderRoomList();}
+
+/* Online */
+async function heartbeat(){
+let d=await getData(); if(!d.online)d.online={};
+d.online[myID]={room:myRoom,time:Date.now()};
+for(let id in d.online){if(Date.now()-d.online[id].time>20000) delete d.online[id];}
+await saveData(d);
+document.getElementById("global-online").textContent="Online: "+Object.keys(d.online).length;
+let count=0; for(let id in d.online){if(d.online[id].room===myRoom) count++;}
+document.getElementById("room-online").textContent="Online: "+count;
+}
+
+/* Intervals */
+setInterval(loadMessages,2000);
+setInterval(heartbeat,10000);
 </script>
 </body>
 </html>
