@@ -172,19 +172,54 @@ async function init(){
 }
 init();
 
-/* ROOM LIST */
-function renderRooms(){
-  const list = document.getElementById("room-list");
+async function renderRooms(){
+  let d = await getData();
+  let list = document.getElementById("room-list");
   list.innerHTML = "";
-  for(let r in roomCache){
-    let room = roomCache[r];
-    let badge = isSuperAdmin ? " 👑" : (room.owner===myID ? " 💎" : (room.admins && room.admins[myID] ? " 🛡️" : ""));
-    const div = document.createElement("div");
-    div.className = "room-item";
-    div.innerHTML = r + badge;
-    div.onclick = () => openRoom(r);
-    list.appendChild(div);
+
+  if(!d.rooms) d.rooms = {};
+
+  for(let r in d.rooms){
+    let room = d.rooms[r];
+
+    // Super admin sees everything
+    if(isSuperAdmin){
+      addRoomToList(r, room);
+      continue;
+    }
+
+    // Owner sees own room
+    if(room.owner === myID){
+      addRoomToList(r, room);
+      continue;
+    }
+
+    // Admin sees room
+    if(room.admins && room.admins[myID]){
+      addRoomToList(r, room);
+      continue;
+    }
+
+    // Normal user sees room only if they have messages in it
+    if(room.messages && room.messages.some(m => m.id === myID)){
+      addRoomToList(r, room);
+      continue;
+    }
   }
+}
+
+function addRoomToList(name, room){
+  let badge = "";
+  if(isSuperAdmin) badge = " 👑";
+  else if(room.owner === myID) badge = " 💎";
+  else if(room.admins && room.admins[myID]) badge = " 🛡️";
+
+  let div = document.createElement("div");
+  div.className = "room-item";
+  div.innerHTML = name + badge;
+  div.onclick = () => openRoom(name);
+
+  document.getElementById("room-list").appendChild(div);
 }
 
 /* CREATE / JOIN ROOM */
