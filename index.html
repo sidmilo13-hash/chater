@@ -81,6 +81,33 @@ button:disabled{opacity:0.5;}
 </div>
 
 <script>
+/* ===== PIN LOCK (SAFE – DOES NOT TOUCH ADMIN) ===== */
+
+(function(){
+
+  let savedPin = localStorage.getItem("pin");
+
+  if(!savedPin){
+    savedPin = prompt("Create PIN:");
+    if(!savedPin){
+      alert("PIN required");
+      document.body.innerHTML = "Locked";
+      throw new Error("Locked");
+    }
+    localStorage.setItem("pin", savedPin);
+  }
+
+  const entered = prompt("Enter PIN:");
+  if(entered !== savedPin){
+    alert("Wrong PIN");
+    document.body.innerHTML = "Locked";
+    throw new Error("Locked");
+  }
+
+})();
+
+/* ===== END PIN LOCK ===== */
+
 /* CONFIG */
 const BIN_ID="6995c8e9ae596e708f347d9b";
 const API_KEY="$2a$10$Xoj7gk3UMX/Xu39sZjITbe1vTxinpZ3KjHuDNvIBeVmMqxBLt5HC.";
