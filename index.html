@@ -87,16 +87,22 @@ const API_KEY="$2a$10$Xoj7gk3UMX/Xu39sZjITbe1vTxinpZ3KjHuDNvIBeVmMqxBLt5HC.";
 const BASE="https://api.jsonbin.io/v3/b/"+BIN_ID;
 const SUPER_PIN="3108";
 
-let myID=localStorage.getItem("uid")||crypto.randomUUID();
-localStorage.setItem("uid",myID);
-let myName=localStorage.getItem("name")||prompt("Your name:");
-localStorage.setItem("name",myName);
-let pin=localStorage.getItem("pin")||prompt("Create PIN:");
-localStorage.setItem("pin",pin);
-if(prompt("Enter PIN:")!==pin) document.body.innerHTML="Locked";
-let isSuperAdmin=(pin===SUPER_PIN);
-let currentRoom=null;
-let cachedMessages=[];
+let myID = localStorage.getItem("uid") || crypto.randomUUID();
+localStorage.setItem("uid", myID);
+let myName = localStorage.getItem("name") || prompt("Your name:");
+localStorage.setItem("name", myName);
+let pin = localStorage.getItem("pin") || prompt("Create PIN:");
+localStorage.setItem("pin", pin);
+
+if(pin !== SUPER_PIN){
+  const entered = prompt("Enter PIN:");
+  if(entered !== pin){ alert("Wrong PIN"); document.body.innerHTML="Locked"; throw new Error("Locked"); }
+}
+
+let isSuperAdmin = (pin === SUPER_PIN);
+let currentRoom = null;
+let cachedMessages = [];
+let roomCache = {};
 
 /* UTILITIES */
 function hideAll(){document.querySelectorAll(".card").forEach(c=>c.classList.add("hidden"));}
@@ -114,50 +120,79 @@ document.getElementById("privateBox").onchange=function(){
 function checkInput(){document.getElementById("sendBtn").disabled=!document.getElementById("msg").value.trim();}
 
 /* JSONBIN */
-async function getData(){try{const r=await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY},cache:"no-store"});return (await r.json()).record;}catch(e){return {rooms:{}};}}
-async function saveData(d){await fetch(BASE,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":API_KEY},body:JSON.stringify(d)});}
+async function getData(){
+  try{
+    const r = await fetch(BASE+"/latest",{headers:{"X-Master-Key":API_KEY},cache:"no-store"});
+    return (await r.json()).record;
+  }catch(e){return {rooms:{}};}
+}
+async function saveData(d){
+  await fetch(BASE,{method:"PUT",headers:{"Content-Type":"application/json","X-Master-Key":API_KEY},body:JSON.stringify(d)});
+}
+
+/* INITIALIZATION */
+async function init(){
+  let d = await getData();
+  roomCache = d.rooms || {};
+  if(isSuperAdmin){
+    for(let r in roomCache){
+      roomCache[r].admins = roomCache[r].admins || {};
+      roomCache[r].admins[myID] = true;
+    }
+    await saveData({rooms:roomCache});
+  }
+  renderRooms();
+}
+init();
 
 /* ROOM LIST */
-async function renderRooms(){
-  let d=await getData(); let list=document.getElementById("room-list"); list.innerHTML="";
-  if(!d.rooms)d.rooms={};
-  for(let r in d.rooms){
-    let room=d.rooms[r]; let badge="";
-    if(isSuperAdmin) badge=" 👑";
-    else if(room.owner===myID) badge=" 💎";
-    else if(room.admins && room.admins[myID]) badge=' 🛡️';
-    let div=document.createElement("div"); div.className="room-item"; div.innerHTML=r+badge;
-    div.onclick=()=>openRoom(r); list.appendChild(div);
+function renderRooms(){
+  const list = document.getElementById("room-list");
+  list.innerHTML = "";
+  for(let r in roomCache){
+    let room = roomCache[r];
+    let badge = isSuperAdmin ? " 👑" : (room.owner===myID ? " 💎" : (room.admins && room.admins[myID] ? " 🛡️" : ""));
+    const div = document.createElement("div");
+    div.className = "room-item";
+    div.innerHTML = r + badge;
+    div.onclick = () => openRoom(r);
+    list.appendChild(div);
   }
 }
 
 /* CREATE / JOIN ROOM */
 async function createRoom(){
-  let name=document.getElementById("room-name").value.trim();
-  let priv=document.getElementById("privateBox").checked;
-  let pass=document.getElementById("room-pass").value.trim();
+  let name = document.getElementById("room-name").value.trim();
+  let priv = document.getElementById("privateBox").checked;
+  let pass = document.getElementById("room-pass").value.trim();
   if(!name) return alert("Enter room name");
   if(priv && !pass) return alert("Set password");
-  let d=await getData(); if(!d.rooms)d.rooms={};
-  if(d.rooms[name]) return alert("Room exists");
-  d.rooms[name]={owner:myID,public:!priv,password:priv?pass:null,admins:{},messages:[]};
-  if(isSuperAdmin) d.rooms[name].admins[myID]=true;
-  await saveData(d);
+
+  if(roomCache[name]) return alert("Room exists");
+
+  roomCache[name] = {owner:myID,public:!priv,password:priv?pass:null,admins:{},messages:[]};
+  if(isSuperAdmin) roomCache[name].admins[myID]=true;
+  await saveData({rooms:roomCache});
   openRoom(name);
 }
 async function joinRoom(){
-  let name=document.getElementById("room-name").value.trim();
-  let d=await getData(); if(!d.rooms[name]) return alert("Room not found");
-  if(!d.rooms[name].public){ let p=prompt("Enter password:"); if(p!==d.rooms[name].password) return alert("Wrong password"); }
-  if(isSuperAdmin) d.rooms[name].admins[myID]=true;
-  await saveData(d);
+  let name = document.getElementById("room-name").value.trim();
+  if(!roomCache[name]) return alert("Room not found");
+  if(!roomCache[name].public){
+    let p = prompt("Enter password:");
+    if(p !== roomCache[name].password) return alert("Wrong password");
+  }
+  if(isSuperAdmin) roomCache[name].admins[myID]=true;
+  await saveData({rooms:roomCache});
   openRoom(name);
 }
 
 /* OPEN ROOM */
 async function openRoom(name){
-  currentRoom=name; cachedMessages=[];
-  hideAll(); document.getElementById("screen-chat").classList.remove("hidden");
+  currentRoom = name;
+  cachedMessages = [];
+  hideAll();
+  document.getElementById("screen-chat").classList.remove("hidden");
   document.getElementById("room-title").textContent=name;
   document.getElementById("chat-box").innerHTML="";
   loadMessages();
@@ -165,36 +200,31 @@ async function openRoom(name){
 
 /* BADGE HELPER */
 function getBadge(id){
-  let badge="";
+  let badge = "";
   if(isSuperAdmin && id===myID) badge+=" 👑";
-  if(currentRoom && window.currentRoomOwner===id) badge+=" 💎";
+  if(currentRoom && roomCache[currentRoom].owner===id) badge+=" 💎";
   return badge;
 }
 
-/* SEND MESSAGE (Optimistic UI + Replace) */
+/* SEND MESSAGE (optimistic) */
 async function sendMsg(){
-  let text=document.getElementById("msg").value.trim();
+  let text = document.getElementById("msg").value.trim();
   if(!text || !currentRoom) return;
-
-  let msgId="msg_"+Date.now()+"_"+Math.random().toString(36).substring(2,8);
+  let msgId = "msg_"+Date.now()+"_"+Math.random().toString(36).substring(2,8);
 
   // Optimistic UI
-  let div=document.createElement("div");
+  const div = document.createElement("div");
   div.className="msg msg-me";
   div.dataset.msgid=msgId;
   div.innerHTML=`<b>${myName}${getBadge(myID)}</b><br>${text}`;
   document.getElementById("chat-box").appendChild(div);
   document.getElementById("chat-box").scrollTop=document.getElementById("chat-box").scrollHeight;
-
-  document.getElementById("msg").value="";
-  checkInput();
+  document.getElementById("msg").value=""; checkInput();
 
   // Save to JSONBin
-  let d=await getData();
-  let room=d.rooms[currentRoom];
-  if(!room) d.rooms[currentRoom]={owner:myID,admins:{},messages:[]};
+  const room = roomCache[currentRoom];
   room.messages.push({u:myName,id:myID,text,msgId});
-  await saveData(d);
+  await saveData({rooms:roomCache});
 }
 
 /* FILES */
@@ -203,34 +233,29 @@ document.getElementById("fileInput").addEventListener("change",async function(){
   let file=this.files[0]; if(!file) return; if(file.size>5*1024*1024) return alert("Max 5MB");
   let reader=new FileReader();
   reader.onload=async()=>{
-    let div=document.createElement("div"); div.className="msg msg-me";
     let msgId="msg_"+Date.now()+"_"+Math.random().toString(36).substring(2,8);
+    const div=document.createElement("div");
+    div.className="msg msg-me";
     div.dataset.msgid=msgId;
     if(file.type.startsWith("image")) div.innerHTML=`<b>${myName}${getBadge(myID)}</b><br><img src="${reader.result}">`;
     if(file.type.startsWith("video")) div.innerHTML=`<b>${myName}${getBadge(myID)}</b><br><video controls src="${reader.result}"></video>`;
     document.getElementById("chat-box").appendChild(div);
     document.getElementById("chat-box").scrollTop=document.getElementById("chat-box").scrollHeight;
-
-    let d=await getData(); let room=d.rooms[currentRoom];
-    room.messages.push({u:myName,id:myID,file:reader.result,type:file.type,msgId});
-    await saveData(d);
+    roomCache[currentRoom].messages.push({u:myName,id:myID,file:reader.result,type:file.type,msgId});
+    await saveData({rooms:roomCache});
   }; reader.readAsDataURL(file);
 });
 
 /* LOAD MESSAGES */
 async function loadMessages(){
   if(!currentRoom) return;
-  let d=await getData();
-  if(!d.rooms[currentRoom]){ showList(); return; }
-  let room=d.rooms[currentRoom];
-  window.currentRoomOwner=room.owner;
-  let box=document.getElementById("chat-box");
-
+  const room = roomCache[currentRoom];
+  const box = document.getElementById("chat-box");
   for(let m of room.messages){
     if(box.querySelector(`[data-msgid="${m.msgId}"]`)) continue;
-    let div=document.createElement("div");
-    div.className="msg "+(m.id===myID?"msg-me":"msg-them");
-    div.dataset.msgid=m.msgId;
+    let div = document.createElement("div");
+    div.className = m.id===myID?"msg msg-me":"msg msg-them";
+    div.dataset.msgid = m.msgId;
     div.innerHTML=`<b>${m.u}${getBadge(m.id)}</b><br>${m.text||""}`;
     if(m.file){
       if(m.type.startsWith("image")) div.innerHTML+='<br><img src="'+m.file+'">';
@@ -238,42 +263,44 @@ async function loadMessages(){
     }
     box.appendChild(div);
   }
-
-  cachedMessages=room.messages.slice();
-  box.scrollTop=box.scrollHeight;
-  renderAdminPanel(d);
+  cachedMessages = room.messages.slice();
+  box.scrollTop = box.scrollHeight;
+  renderAdminPanel();
 }
 
 /* ADMIN PANEL */
-function renderAdminPanel(d){
-  let panel=document.getElementById("admin-panel");
-  let room=d.rooms[currentRoom]; if(!room){panel.classList.add("hidden");return;}
-  let allowed=isSuperAdmin || room.owner===myID || (room.admins && room.admins[myID]);
-  if(!allowed){panel.classList.add("hidden");return;} panel.classList.remove("hidden");
-  let html="<b>Admin Panel</b><br>Users:<br>";
-  let users={}; room.messages.forEach(m=>users[m.id]=m.u);
+function renderAdminPanel(){
+  const panel = document.getElementById("admin-panel");
+  if(!currentRoom) {panel.classList.add("hidden"); return;}
+  const room = roomCache[currentRoom];
+  const allowed = isSuperAdmin || room.owner===myID || (room.admins && room.admins[myID]);
+  if(!allowed){panel.classList.add("hidden"); return;}
+  panel.classList.remove("hidden");
+
+  let html = "<b>Admin Panel</b><br>Users:<br>";
+  const users = {};
+  room.messages.forEach(m=>users[m.id]=m.u);
   for(let id in users){
-    let b=""; if(isSuperAdmin && id===myID) b+=" 👑"; if(room.owner===id) b+=" 💎"; if(room.admins && room.admins[id]) b+=' 🛡️';
-    html+=users[id]+b;
+    let b = ""; if(isSuperAdmin && id===myID) b+=" 👑"; if(room.owner===id) b+=" 💎"; if(room.admins && room.admins[id]) b+=' 🛡️';
+    html += users[id]+b;
     if((isSuperAdmin || room.owner===myID) && id!==myID){
-      html+=` <span class="user-buttons"><button onclick="kickUser('${id}')">Kick</button>`;
-      if(room.admins && room.admins[id]) html+=` <button onclick="demoteAdmin('${id}')">Demote</button>`;
-      else html+=` <button onclick="promoteAdmin('${id}')">Promote</button>`;
-      html+='</span>';
+      html += ` <span class="user-buttons"><button onclick="kickUser('${id}')">Kick</button>`;
+      html += room.admins && room.admins[id] ? `<button onclick="demoteAdmin('${id}')">Demote</button>` : `<button onclick="promoteAdmin('${id}')">Promote</button>`;
+      html += '</span>';
     }
     html+="<br>";
   }
   if(isSuperAdmin || room.owner===myID) html+="<button onclick='clearChat()'>Clear Chat</button>";
   if(isSuperAdmin) html+=" <button onclick='deleteRoom()'>Delete Room</button>";
-  panel.innerHTML=html;
+  panel.innerHTML = html;
 }
 
 /* ADMIN FUNCTIONS */
-async function kickUser(id){if(!confirm("Kick user?")) return; let d=await getData(); let room=d.rooms[currentRoom]; room.messages.push({u:"System",id:"system",text:users[id]+" was kicked",msgId:"sys_"+Date.now()}); await saveData(d);}
-async function clearChat(){if(!confirm("Clear chat?")) return; let d=await getData(); d.rooms[currentRoom].messages=[]; cachedMessages=[]; await saveData(d); loadMessages();}
-async function deleteRoom(){if(!confirm("Delete room?")) return; let d=await getData(); delete d.rooms[currentRoom]; await saveData(d); showList();}
-async function promoteAdmin(id){let d=await getData(); let room=d.rooms[currentRoom]; room.admins=room.admins||{}; room.admins[id]=true; await saveData(d); loadMessages();}
-async function demoteAdmin(id){let d=await getData(); let room=d.rooms[currentRoom]; if(room.admins) delete room.admins[id]; await saveData(d); loadMessages();}
+async function kickUser(id){if(!confirm("Kick user?")) return; roomCache[currentRoom].messages.push({u:"System",id:"system",text:"User was kicked",msgId:"sys_"+Date.now()}); await saveData({rooms:roomCache}); loadMessages();}
+async function clearChat(){if(!confirm("Clear chat?")) return; roomCache[currentRoom].messages=[]; cachedMessages=[]; await saveData({rooms:roomCache}); loadMessages();}
+async function deleteRoom(){if(!confirm("Delete room?")) return; delete roomCache[currentRoom]; await saveData({rooms:roomCache}); showList();}
+async function promoteAdmin(id){roomCache[currentRoom].admins=roomCache[currentRoom].admins||{}; roomCache[currentRoom].admins[id]=true; await saveData({rooms:roomCache}); renderAdminPanel();}
+async function demoteAdmin(id){if(roomCache[currentRoom].admins) delete roomCache[currentRoom].admins[id]; await saveData({rooms:roomCache}); renderAdminPanel();}
 
 /* SETTINGS */
 function saveSettings(){
@@ -281,13 +308,24 @@ function saveSettings(){
   let p=document.getElementById("settings-pin").value.trim();
   if(!n || !p) return alert("Cannot be empty");
   myName=n; pin=p; localStorage.setItem("name",n); localStorage.setItem("pin",p);
-  isSuperAdmin=(p===SUPER_PIN); alert("Saved"); showList();
+  isSuperAdmin = (p===SUPER_PIN);
+  alert("Saved");
+  showList();
 }
 
-/* POLLING */
-async function pollLoop(){if(currentRoom) await loadMessages(); setTimeout(pollLoop,1500);}
+/* POLLING (current room only) */
+async function pollLoop(){
+  if(currentRoom){
+    const d = await getData();
+    const room = d.rooms[currentRoom];
+    if(room && room.messages.length!==cachedMessages.length){
+      roomCache[currentRoom] = room;
+      loadMessages();
+    }
+  }
+  setTimeout(pollLoop,1500);
+}
 pollLoop();
-document.addEventListener("visibilitychange",()=>{if(!document.hidden && currentRoom) loadMessages();});
 
 showList();
 </script>
